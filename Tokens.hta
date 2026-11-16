@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=8" />
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta http-equiv="MSThemeCompatible" content="yes" />
+	<title>Утилита проверки Рутокенов версия 3.4.2 | ChatGPT + Zerik fix #12</title>
+	<hta:application id="oHTA" innerBorder="no" />
+	<style>
+		body {
+			font-family: "Segoe UI", "Helvetica Neue", Arial, Tahoma, "sans-serif", Verdana;
+			font-size: 18px;
+			padding-top: 34px;
+		}
+		#app-build {
+			position: absolute;
+			top: 4px;
+			right: 8px;
+			z-index: 1000;
+			padding: 5px 8px;
+			border: 1px solid #999;
+			background: #fff;
+			font-size: 12px;
+			text-align: right;
+		}
+		#build-changes {
+			display: none;
+			width: 430px;
+			margin-top: 5px;
+			padding-top: 5px;
+			border-top: 1px solid #ccc;
+			text-align: left;
+		}
+		table, tr, td, th {
+			border: 2px solid gray;
+			border-collapse: collapse;
+			vertical-align: top;
+			padding: 3px;
+			width: auto;
+		}
+	</style>
+</head>
+<body>
+	<div id="app-build">
+		<b>Утилита проверки Рутокенов 3.4.2 | ChatGPT + Zerik fix #12</b>&nbsp;&nbsp;
+		<a href="#" onclick="var changes = document.getElementById('build-changes'); changes.style.display = (changes.style.display == 'none' ? 'block' : 'none'); return false;">Список изменений</a>
+		<div id="build-changes">
+			<b>Исправление №12</b>
+			<ol style="margin: 5px 0 0 18px; padding: 0;">
+				<li>Показываются имя владельца сертификата и срок его действия.</li>
+				<li>Имя контейнера при экспорте формируется по-русски, с датой окончания.</li>
+				<li>Имя папки латиницей включает дату в формате namesddm.myy.</li>
+				<li>Экспорт сохраняется в «Документы\Tokens\дата».</li>
+				<li>После экспорта открывается папка с текущей датой.</li>
+				<li>Если папка или ZIP уже существуют, появляется ошибка; номер не увеличивается.</li>
+				<li>Быстрый экспорт выполняется без запросов и окон подтверждения.</li>
+				<li>Создаётся ZIP-копия ключевых файлов.</li>
+				<li>PowerShell запускается скрыто.</li>
+				<li>Поддерживаются контейнеры с разными числовыми окончаниями.</li>
+				<li>Повторный экспорт не меняет исходные данные контейнера в приложении.</li>
+				<li>Исправлена обработка двух последних цифр года в HTA на базе IE8.</li>
+			</ol>
+		</div>
+	</div>
+	<div id="noscript" style="background-color: #FFCCCC">
+		JavaScript запрещен в Internet Explorer. Пожалуйста, включите его.
+	</div>
+	<div id="info">Подготавливаем скрипт для выполнения... подождите...</div>
+	<script type="text/javascript"><!--
+		function ge(id) {
+			return ("string" == typeof(id)) ? (document ? document.getElementById(id) : null) : id;
+		}
+
+		function display(id, vis) {
+			var obj = ge(id);
+			if (obj) {
+				obj.style.display = ("string" == typeof(vis)) ? vis : (vis ? "block" : "none");
+			}
+		}
+
+		display("noscript", false);
+
+		var txt = ge("info").innerHTML;
+
+		function action(text) {
+			txt += "<br/>" + text;
+			ge("info").innerHTML = txt;
+		}
+
+		function error(text) {
+			action('<span style="background-color: #FFCCCC">' + text + '</span>');
+		}
+
+		function getVBArray(arr) { // внимание: arr может быть undefined, это нормально
+			return (null !== arr) ? new window.VBArray(arr).toArray() : null;
+		}
+
+		function idToStr(vbarr) {
+			var arr = getVBArray(vbarr),
+				buffer = [];
+			for (var j = arr.length - 1; j >= 0; --j) {
+				if (arr[j] < 16) { buffer.push("0"); }
+				buffer.push(arr[j].toString(16).toUpperCase());
+			}
+			var idStr = buffer.join("");
+			if (idStr && (0 === idStr.indexOf("00000000"))) {
+				idStr = idStr.substr(8);
+			}
+			return idStr;
+		}
+
+		function intToHex(num) {
+			if (num < 0) {
+				num = 0xFFFFFFFF + num + 1;
+			}
+			return "0x" + num.toString(16).toUpperCase();
+		}
+
+		function errorToText(err) {
+			var descr = err ? (err.description || err.message || "Неизвестная ошибка") : "null",
+				number = err.number;
+			return err ? descr + (number ? " (" + intToHex(number) + ", " + number + ")" : "") : "null";
+		}
+
+		action("Создаем новый COM объект... это может занять несколько секунд...");
+
+		var encoding1251 = [
+			'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f',		// 0 - 15
+			'\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f',	// 16 - 31
+			' !"#$%&\'()*+,-./',	// 32 - 47
+			'0123456789:;<=>?',		// 48 - 63
+			'@ABCDEFGHIJKLMNO',		// 64 - 79
+			'PQRSTUVWXYZ[\\]^_',	// 80 - 95
+			'`abcdefghijklmno',		// 96 - 111
+			'pqrstuvwxyz{|}~\x7f',	// 112 - 127
+			'\u0402\u0403\u201a\u0453\u201e\u2026\u2020\u2021\u20ac\u2030\u0409\u2039\u040a\u040c\u040b\u040f',//128-
+			'\u0452\u2018\u2019\u201c\u201d\u2022\u2013\u2014\ufffd\u2122\u0459\u203a\u045a\u045c\u045b\u045f',//144-
+			'\xa0\u040e\u045e\u0408\xa4\u0490\xa6\xa7\u0401\xa9\u0404\xab\xac\xad\xae\u0407',		// 160 - 175
+			'\xb0\xb1\u0406\u0456\u0491\xb5\xb6\xb7\u0451\u2116\u0454\xbb\u0458\u0405\u0455\u0457',	// 176 - 191
+			'\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a\u041b\u041c\u041d\u041e\u041f',//192-
+			'\u0420\u0421\u0422\u0423\u0424\u0425\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f',//208-
+			'\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a\u043b\u043c\u043d\u043e\u043f',//224-
+			'\u0440\u0441\u0442\u0443\u0444\u0445\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f' //240-
+		].join("");
+		
+		var decodeTable1251 = [
+			{ offset: 0xC0, data: "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" },
+			{ offset: 0xE0, data: "абвгдежзийклмнопрстуфхцчшщъыьэюя" },
+			{ offset: 0xA8, data: "Ё" },
+			{ offset: 0xB8, data: "ё№" }
+		];
+		var decoding1251 = {};
+		for (var d = 32; d < 128; ++d) {
+			decoding1251[String.fromCharCode(d)] = d;
+		}
+		for (var d = 0; d < decodeTable1251.length; ++d) {
+			var dOfs = decodeTable1251[d].offset,
+				dDat = decodeTable1251[d].data;
+			for (var dd = 0; dd < dDat.length; ++dd) {
+				decoding1251[dDat.charAt(dd)] = dOfs + dd;
+			}
+		}
+
+		function decodeBytes(bytes) {
+			var n = bytes.length,
+				chars = new Array(n);
+			for (var i = 0; i < n; ++i) {
+				chars[i] = (bytes[i] < 32) ? "?" : encoding1251.charAt(bytes[i]);
+			}
+			return chars.join("");
+		}
+
+		function decodeUTF8(bytes) {
+			var source = decodeBytes(bytes);
+			try {
+				var stream = new ActiveXObject("ADODB.Stream");
+				stream.Open();
+				stream.Type = 2;
+				stream.Charset = "windows-1251";
+				stream.WriteText(source);
+				stream.Position = 0;
+				stream.Type = 2;
+				stream.Charset = "utf-8";
+				var utf8str = stream.ReadText(-1);
+				try { stream.Close(); } catch(ex3) {}
+				return utf8str;
+			} catch(ex2) {
+				return source;
+			}
+		}
+
+		function encodeString(str) {
+			var n = str.length,
+				bytes = new Array(n);
+			for (var i = 0; i < n; ++i) {
+				bytes[i] = decoding1251[str.charAt(i)] || 32;
+			}
+			return bytes;
+		}
+
+		function createDomDocument() {
+			var mdd = [ "Msxml2.DOMDocument", "Msxml2.DOMDocument.6.0", "Msxml2.DOMDocument.3.0" ],
+				lastError = new Error();
+			for (var i = 0, il = mdd.length; i < il; ++i) {
+				try {
+					return new ActiveXObject(mdd[i]);
+				} catch(ex2) {
+					lastError = ex2;
+				}
+			}
+			throw lastError;
+		}
+
+		function decodeBase64(str) {
+			var xml = createDomDocument();
+			try { xml.async = false; } catch(e) {}
+			var elem = xml.createElement("tmp");
+			elem.dataType = "bin.base64";
+			elem.text = str;
+			return elem.nodeTypedValue;
+		}
+
+		function byteArrayToBase64(arr) {
+			var base64digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+				byteNum = 2,
+				prev = 0,
+				result = [];
+
+			for (var i = 0, il = arr.length; i < il; ++i) {
+				var cur = arr[i];
+				if (cur < 0 || cur > 255) {
+					return "";
+				}
+				byteNum = i % 3;
+				switch(byteNum) {
+					case 0:
+						result.push(base64digits.charAt(cur >> 2));
+						break;
+					case 1:
+						result.push(base64digits.charAt(((prev & 3) << 4) | (cur >> 4)));
+						break;
+					case 2:
+						result.push(base64digits.charAt(((prev & 15) << 2) | (cur >> 6)));
+						result.push(base64digits.charAt(cur & 0x3f));
+						break;
+					default:
+						break;
+				}
+				prev = cur;
+			}
+			switch(byteNum) {
+				case 0:
+					result.push(base64digits.charAt((prev & 3) << 4));
+					result.push("==");
+					break;
+				case 1:
+					result.push(base64digits.charAt((prev & 0x0f) << 2));
+					result.push("=");
+					break;
+				default:
+					break;
+			}
+			return result.join("");
+		}
+
+		function encodePowerShellCommand(source) {
+			var bytes = [];
+			for (var i = 0; i < source.length; ++i) {
+				var code = source.charCodeAt(i);
+				bytes.push(code & 255, (code >> 8) & 255);
+			}
+			return byteArrayToBase64(bytes);
+		}
+
+		function decodeUtf8Base64(value) {
+			var stream = new ActiveXObject("ADODB.Stream");
+			stream.Open();
+			stream.Type = 1;
+			stream.Write(decodeBase64(value));
+			stream.Position = 0;
+			stream.Type = 2;
+			stream.Charset = "utf-8";
+			var result = stream.ReadText(-1);
+			try { stream.Close(); } catch(e) {}
+			return result;
+		}
+
+		function normalizeContainerId(value) {
+			var text = String(value || "").replace(/^\s+|\s+$/g, "").replace(/[{}]/g, "").toLowerCase(),
+				guid = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+			return guid ? guid[0].toLowerCase() : text;
+		}
+
+		function parseCertificateDate(value) {
+			var parts = String(value || "").split(".");
+			return (3 == parts.length) ? new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])) : new Date(0);
+		}
+
+		function certificateIsPreferred(candidate, current) {
+			if (!current) { return true; }
+			var today = new Date(),
+				candidateValid = (parseCertificateDate(candidate.NotBefore) <= today) && (today <= parseCertificateDate(candidate.NotAfter)),
+				currentValid = (parseCertificateDate(current.NotBefore) <= today) && (today <= parseCertificateDate(current.NotAfter));
+			if (candidateValid != currentValid) { return candidateValid; }
+			return parseCertificateDate(candidate.NotAfter) > parseCertificateDate(current.NotAfter);
+		}
+
+		var certificateMap = null, certificateMapLoaded = false;
+		function getCertificateMap() {
+			if (certificateMapLoaded) { return certificateMap; }
+			certificateMapLoaded = true;
+			certificateMap = {};
+			var psLines = [
+				"$ErrorActionPreference = 'SilentlyContinue'",
+				"$ProgressPreference = 'SilentlyContinue'",
+				"Add-Type -TypeDefinition @'",
+				"using System;",
+				"using System.Runtime.InteropServices;",
+				"using System.Security.Cryptography.X509Certificates;",
+				"public static class RutokenCertificateInfo {",
+				"  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]",
+				"  private struct CRYPT_KEY_PROV_INFO {",
+				"    public IntPtr pwszContainerName; public IntPtr pwszProvName; public uint dwProvType; public uint dwFlags; public uint cProvParam; public IntPtr rgProvParam; public uint dwKeySpec;",
+				"  }",
+				"  [DllImport(\"crypt32.dll\", SetLastError = true)]",
+				"  private static extern bool CertGetCertificateContextProperty(IntPtr context, uint propertyId, IntPtr data, ref uint size);",
+				"  public static string GetContainerName(X509Certificate2 cert) {",
+				"    uint size = 0;",
+				"    CertGetCertificateContextProperty(cert.Handle, 2, IntPtr.Zero, ref size);",
+				"    if (size == 0) return null;",
+				"    IntPtr data = Marshal.AllocHGlobal((int)size);",
+				"    try {",
+				"      if (!CertGetCertificateContextProperty(cert.Handle, 2, data, ref size)) return null;",
+				"      CRYPT_KEY_PROV_INFO info = (CRYPT_KEY_PROV_INFO)Marshal.PtrToStructure(data, typeof(CRYPT_KEY_PROV_INFO));",
+				"      return (info.pwszContainerName == IntPtr.Zero) ? null : Marshal.PtrToStringUni(info.pwszContainerName);",
+				"    } finally { Marshal.FreeHGlobal(data); }",
+				"  }",
+				"}",
+				"'@",
+				"$stores = @('Cert:\\CurrentUser\\My', 'Cert:\\LocalMachine\\My')",
+				"$result = @()",
+				"foreach ($storePath in $stores) {",
+				"  foreach ($cert in (Get-ChildItem -Path $storePath -ErrorAction SilentlyContinue)) {",
+				"    try {",
+				"      $container = [RutokenCertificateInfo]::GetContainerName($cert)",
+				"      if ([string]::IsNullOrEmpty($container)) { continue }",
+				"      $name = $cert.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)",
+				"      if ([string]::IsNullOrEmpty($name)) { $name = $cert.Subject }",
+				"      $fields = @($container, $name, $cert.NotBefore.ToString('dd.MM.yyyy'), $cert.NotAfter.ToString('dd.MM.yyyy'))",
+				"      $encoded = @($fields | ForEach-Object { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_)) })",
+				"      $result += [String]::Join([string][char]9, $encoded)",
+				"    } catch {}",
+				"  }",
+				"}",
+				"[System.IO.File]::WriteAllLines($outputPath, [string[]]$result, [Text.Encoding]::ASCII)"
+			];
+			var tempFso = null, tempOutputPath = "";
+			try {
+				var shell = new ActiveXObject("WScript.Shell");
+				tempFso = new ActiveXObject("Scripting.FileSystemObject");
+				tempOutputPath = tempFso.BuildPath(tempFso.GetSpecialFolder(2), tempFso.GetTempName());
+				psLines.unshift("$outputPath = '" + tempOutputPath.replace(/'/g, "''") + "'");
+				var encodedCommand = encodePowerShellCommand(psLines.join("\r\n")),
+					command = "powershell.exe -WindowStyle Hidden -NoLogo -NoProfile -NonInteractive -EncodedCommand " + encodedCommand;
+				shell.Run(command, 0, true);
+				var output = "";
+				if (tempFso.FileExists(tempOutputPath)) {
+					var tempFile = tempFso.OpenTextFile(tempOutputPath, 1, false, 0);
+					output = tempFile.ReadAll();
+					tempFile.Close();
+				}
+				var lines = output.split(/\r?\n/);
+				for (var i = 0; i < lines.length; ++i) {
+					var fields = lines[i].split("\t");
+					if (fields.length < 4) { continue; }
+					var info = {
+						Name: decodeUtf8Base64(fields[1]),
+						NotBefore: decodeUtf8Base64(fields[2]),
+						NotAfter: decodeUtf8Base64(fields[3])
+					}, key = normalizeContainerId(decodeUtf8Base64(fields[0]));
+					if (key && certificateIsPreferred(info, certificateMap[key])) {
+						certificateMap[key] = info;
+					}
+				}
+			} catch(e) {}
+			finally {
+				try { if (tempFso && tempOutputPath && tempFso.FileExists(tempOutputPath)) { tempFso.DeleteFile(tempOutputPath, true); } } catch(cleanupError) {}
+			}
+			return certificateMap;
+		}
+
+		function findCertificate(containerId) {
+			var map = getCertificateMap(), key = normalizeContainerId(containerId);
+			return map && key && map[key] ? map[key] : null;
+		}
+
+		function htmlEscape(value) {
+			return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+		}
+
+		function certificateDisplay(info) {
+			return htmlEscape(info.Name) + '<br/><span>Срок действия: ' + htmlEscape(info.NotBefore) + ' — ' + htmlEscape(info.NotAfter) + '</span>';
+		}
+
+		function transliterateToLatin(value) {
+			var transliteration = {
+				"а":"a", "б":"b", "в":"v", "г":"g", "д":"d", "е":"e", "ё":"yo", "ж":"zh", "з":"z", "и":"i", "й":"y",
+				"к":"k", "л":"l", "м":"m", "н":"n", "о":"o", "п":"p", "р":"r", "с":"s", "т":"t", "у":"u", "ф":"f",
+				"х":"kh", "ц":"ts", "ч":"ch", "ш":"sh", "щ":"shch", "ъ":"", "ы":"y", "ь":"", "э":"e", "ю":"yu", "я":"ya"
+			};
+			return String(value || "").replace(/[А-Яа-яЁё]/g, function(ch) {
+				var latin = transliteration[ch.toLowerCase()] || "";
+				return (ch == ch.toUpperCase() && ch != ch.toLowerCase()) ? latin.toUpperCase() : latin;
+			}).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+		}
+
+		function latinExportFolderInfo(info) {
+			var latinName = transliterateToLatin(info.Name),
+				surname = latinName.split("_")[0],
+				dateParts = String(info.NotAfter || "").split("."),
+				latinPrefix = (surname.substr(0, 5) || "CERT").toUpperCase();
+			if (3 == dateParts.length && 4 == dateParts[2].length && /^\d+$/.test(dateParts[0] + dateParts[1] + dateParts[2])) {
+				var dateDigits = dateParts[0] + dateParts[1] + dateParts[2].substring(dateParts[2].length - 2);
+				return {
+					Base: latinPrefix + dateDigits.substr(0, 3),
+					Serial: Number(dateDigits.substr(3, 3))
+				};
+			}
+			return { Base: latinPrefix.substr(0, 8), Serial: 0 };
+		}
+
+		var keyData = {}, keyNames = {}, keyCertificates = {}, tokErr = {};
+
+		function addTokenError(tokenName, errDescr, errText) {
+			if (!tokErr[tokenName]) { tokErr[tokenName] = []; }
+			var backDescr = '<span style="padding: 5px; background-color: #FFCCCC">' + errDescr + '</span>';
+			tokErr[tokenName].push(backDescr + "<br/>&nbsp;&nbsp;&nbsp;&nbsp;" + errText);
+			error(errDescr);
+			error(errText);
+		}
+
+		function zipPut16(bytes, value) {
+			bytes.push(value & 255, (value >> 8) & 255);
+		}
+
+		function zipPut32(bytes, value) {
+			bytes.push(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
+		}
+
+		function zipCrc32(bytes) {
+			var crc = 0xFFFFFFFF;
+			for (var i = 0; i < bytes.length; ++i) {
+				crc ^= bytes[i] & 255;
+				for (var j = 0; j < 8; ++j) {
+					crc = (crc & 1) ? ((crc >>> 1) ^ 0xEDB88320) : (crc >>> 1);
+				}
+			}
+			return (crc ^ 0xFFFFFFFF) >>> 0;
+		}
+
+		function makeZipBytes(files) {
+			var localData = [], centralData = [], fileCount = 0,
+				now = new Date(),
+				year = Math.max(1980, now.getFullYear()),
+				dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2),
+				dosDate = ((year - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+			for (var fileName in files) {
+				if (!files.hasOwnProperty(fileName)) { continue; }
+				var nameBytes = [], data = files[fileName] || [],
+					crc = zipCrc32(data),
+					offset = localData.length;
+				for (var n = 0; n < fileName.length; ++n) { nameBytes.push(fileName.charCodeAt(n) & 255); }
+				zipPut32(localData, 0x04034B50);
+				zipPut16(localData, 20);
+				zipPut16(localData, 0);
+				zipPut16(localData, 0);
+				zipPut16(localData, dosTime);
+				zipPut16(localData, dosDate);
+				zipPut32(localData, crc);
+				zipPut32(localData, data.length);
+				zipPut32(localData, data.length);
+				zipPut16(localData, nameBytes.length);
+				zipPut16(localData, 0);
+				for (var ni = 0; ni < nameBytes.length; ++ni) { localData.push(nameBytes[ni]); }
+				for (var di = 0; di < data.length; ++di) { localData.push(data[di] & 255); }
+
+				zipPut32(centralData, 0x02014B50);
+				zipPut16(centralData, 20);
+				zipPut16(centralData, 20);
+				zipPut16(centralData, 0);
+				zipPut16(centralData, 0);
+				zipPut16(centralData, dosTime);
+				zipPut16(centralData, dosDate);
+				zipPut32(centralData, crc);
+				zipPut32(centralData, data.length);
+				zipPut32(centralData, data.length);
+				zipPut16(centralData, nameBytes.length);
+				zipPut16(centralData, 0);
+				zipPut16(centralData, 0);
+				zipPut16(centralData, 0);
+				zipPut16(centralData, 0);
+				zipPut32(centralData, 0);
+				zipPut32(centralData, offset);
+				for (var cj = 0; cj < nameBytes.length; ++cj) { centralData.push(nameBytes[cj]); }
+				++fileCount;
+			}
+			var centralOffset = localData.length;
+			for (var c = 0; c < centralData.length; ++c) { localData.push(centralData[c]); }
+			zipPut32(localData, 0x06054B50);
+			zipPut16(localData, 0);
+			zipPut16(localData, 0);
+			zipPut16(localData, fileCount);
+			zipPut16(localData, fileCount);
+			zipPut32(localData, centralData.length);
+			zipPut32(localData, centralOffset);
+			zipPut16(localData, 0);
+			return localData;
+		}
+
+		function saveZipArchive(fso, path, files) {
+			var stream = null;
+			try {
+				var zipBytes = makeZipBytes(files);
+				stream = new ActiveXObject("ADODB.Stream");
+				stream.Open();
+				stream.Type = 1;
+				stream.Write(decodeBase64(byteArrayToBase64(zipBytes)));
+				stream.SaveToFile(path, 1);
+				stream.Close();
+				return true;
+			} catch(e) {
+				try { if (stream) { stream.Close(); } } catch(closeError) {}
+				return false;
+			}
+		}
+
+		function saveKeyData(tokName, dirPath, quick) {
+			quick = !!quick;
+			if (!keyData || !keyData[tokName] || !keyData[tokName][dirPath]) {
+				if (quick) { error("Не найдены файлы для " + tokName + " и пути " + dirPath); }
+				else { alert("Не найдены файлы для " + tokName + " и пути " + dirPath); }
+				return false;
+			}
+			var fso = new ActiveXObject("Scripting.FileSystemObject"),
+				wsh = new ActiveXObject("WScript.Shell"),
+				documentsFolder = wsh.SpecialFolders("MyDocuments"),
+				tokensFolder = fso.BuildPath(documentsFolder, "Tokens"),
+				today = new Date(),
+				dateFolderName = ("0" + today.getDate()).slice(-2) + "." + ("0" + (today.getMonth() + 1)).slice(-2) + "." + today.getFullYear(),
+				dateFolder = fso.BuildPath(tokensFolder, dateFolderName),
+				lastDir = dirPath.replace(/\/$/, "").split("/");
+			lastDir = lastDir[lastDir.length - 1];
+			try {
+				if (!fso.FolderExists(tokensFolder)) { fso.CreateFolder(tokensFolder); }
+				if (!fso.FolderExists(dateFolder)) { fso.CreateFolder(dateFolder); }
+			} catch(folderError) {
+				if (quick) { error("Не удалось подготовить папку экспорта: " + errorToText(folderError)); }
+				else { alert("Не удалось подготовить папку экспорта:\n" + errorToText(folderError)); }
+				return false;
+			}
+			var sourceFiles = keyData[tokName][dirPath], exportFiles = {};
+			for (var sourceFile in sourceFiles) {
+				if (sourceFiles.hasOwnProperty(sourceFile)) { exportFiles[sourceFile] = sourceFiles[sourceFile]; }
+			}
+			var oldNameKey = exportFiles["name.key"],
+				contName = keyNames[tokName + "_" + dirPath],
+				certInfo = keyCertificates[tokName + "_" + dirPath],
+				exportNameSuffix = certInfo ? " до " + certInfo.NotAfter + " копия" : " копия",
+				newContName = (certInfo ? certInfo.Name : contName) + exportNameSuffix;
+			if (oldNameKey && contName) {
+				if (!certInfo && contName.length > 247) {
+					if (!quick) {
+						var longMsg = "Длина имени контейнера (" + contName.length + " символов).\n";
+						longMsg += 'Данная программа не умеет менять имена контейнеров длиной более 247 символов.\n';
+						longMsg += 'Контейнер будет скопирован с тем же именем.';
+						alert(longMsg);
+					}
+					newContName = contName;
+				} else {
+					if (newContName.length > 253) {
+						newContName = newContName.substr(0, 253 - exportNameSuffix.length) + exportNameSuffix;
+					}
+					if (!quick) {
+						var promptText = certInfo
+							? "Сертификат на имя: " + certInfo.Name + "\nСрок действия: " + certInfo.NotBefore + " — " + certInfo.NotAfter + "\n\nДружеское имя контейнера:"
+							: "Исходное имя: " + contName + "\nРекомендуется изменить имя, например, на:";
+						while(true) {
+							newContName = prompt(promptText, newContName);
+							newContName = (newContName || "").replace(new RegExp("^\\s+|\\s+$", "g"), "");
+							newContName = newContName.replace(new RegExp("\\s\\s+", "g"), " ");
+							if (!newContName || !newContName.length) {
+								alert("Не задано новое имя для контейнера. Экспорт не выполнен.");
+								return false;
+							}
+							if (newContName.length <= 253) { break; }
+							var longNameMsg = "Вы указали имя контейнера длиной " + newContName.length + " символов.\n";
+							longNameMsg += "Данная программа не умеет задавать новые имена контейнеров длиной более 253 символов.\n";
+							longNameMsg += "Пожалуйста, нажмите ОК и укоротите новое имя контейнера.";
+							alert(longNameMsg);
+						}
+					}
+					if (contName != newContName) {
+						var newNameArray = [48, newContName.length + 2, 22, newContName.length],
+							newNameKey = newNameArray.concat(encodeString(newContName));
+						newNameKey = newNameKey.concat(oldNameKey.slice(newNameKey.length));
+						exportFiles["name.key"] = newNameKey;
+					}
+				}
+			}
+			var folderInfo = certInfo ? latinExportFolderInfo(certInfo) : null,
+				exportLabel = folderInfo ? folderInfo.Base : lastDir,
+				serialNumber = folderInfo ? folderInfo.Serial : 0,
+				serialText = ("00" + serialNumber).slice(-3),
+				legacyDestination = fso.BuildPath(dateFolder, exportLabel),
+				checkLegacy = !folderInfo,
+				destination = fso.BuildPath(dateFolder, exportLabel + "." + serialText),
+				archivePath = fso.BuildPath(dateFolder, exportLabel + "." + serialText + ".zip");
+			function existingExportPath() {
+				if (fso.FolderExists(destination) || fso.FileExists(destination)) { return destination; }
+				if (fso.FileExists(archivePath)) { return archivePath; }
+				if (checkLegacy && (fso.FolderExists(legacyDestination) || fso.FileExists(legacyDestination))) { return legacyDestination; }
+				return "";
+			}
+			var existingPath = existingExportPath();
+			if (existingPath) {
+				var existsMessage = "Экспорт не выполнен: сертификат уже существует: " + existingPath;
+				if (quick) { error(existsMessage); }
+				else { alert(existsMessage); }
+				return false;
+			}
+			try {
+				fso.CreateFolder(destination);
+			} catch(createError) {
+				existingPath = existingExportPath();
+				if (existingPath) {
+					var existsMessage = "Экспорт не выполнен: сертификат уже существует: " + existingPath;
+					if (quick) { error(existsMessage); }
+					else { alert(existsMessage); }
+				} else if (quick) { error("Не удалось создать папку экспорта: " + destination + ". " + errorToText(createError)); }
+				else { alert("Не удалось создать папку экспорта:\n" + destination + "\n" + errorToText(createError)); }
+				return false;
+			}
+			try {
+				for (var k in exportFiles) {
+					if (!exportFiles.hasOwnProperty(k)) { continue; }
+					var stream = new ActiveXObject("ADODB.Stream");
+					stream.Open();
+					stream.Type = 1;
+					stream.Write(decodeBase64(byteArrayToBase64(exportFiles[k])));
+					stream.SaveToFile(fso.BuildPath(destination, k), 1);
+					try { stream.Close(); } catch(e) {}
+				}
+			} catch(fileError) {
+				if (quick) { error("Ошибка сохранения файлов контейнера: " + errorToText(fileError)); }
+				else { alert("Ошибка сохранения файлов контейнера:\n" + errorToText(fileError)); }
+				try { wsh.Run('explorer.exe "' + dateFolder + '"', 1, false); } catch(openError) {}
+				return false;
+			}
+			if (!saveZipArchive(fso, archivePath, exportFiles)) {
+				if (quick) { error("Контейнер сохранён, но ZIP-копию создать не удалось: " + archivePath); }
+				else { alert("Контейнер сохранён, но ZIP-копию создать не удалось:\n" + archivePath); }
+			}
+			if (!quick) { alert("Экспорт завершен:\n" + destination + "\nZIP-копия: " + archivePath); }
+			try { wsh.Run('explorer.exe "' + dateFolder + '"', 1, false); } catch(openError) {}
+			return false;
+		}
+
+		function unblockToken(tokenName, obj) {
+			try {
+				var r = new ActiveXObject("rtCOMLite.rtContext");
+				r.Acquire();
+				try {
+					var rt = r.OpenReader(tokenName, 2, 5000);
+					try {
+						rt.BeginTransaction();
+						try {
+							var adminPinDefault = false;
+							try { adminPinDefault = rt.IsPINDefault(1); } catch(ex2) {}
+							try {
+								if (!adminPinDefault) { throw new Error(); }
+								rt.UnblockUserPINIfAdminPINIsDefault();
+							} catch(ex2) {
+								alert("Пожалуйста, в следующем окне выберите вход от администратора и введите пин-код");
+								rt.AuthenticateOwnerFromGUI();
+								rt.UnblockUserPIN();
+							}
+							var newTries = rt.GetRetryCounter(2);
+							if (newTries > 0) {
+								var td = obj.parentNode;
+								td.style.backgroundColor = "#CCFFCC";
+								td.innerHTML = "Разблокировано<br/>" + newTries;
+							}
+						} finally {
+							rt.EndTransaction();
+						}
+					} finally {
+						r.CloseReader(rt, 0);
+					}
+				} finally {
+					r.Free();
+				}
+			} catch(ex) {
+				alert("Не удалось разблокировать, ошибка:\n" + errorToText(ex));
+			}
+		}
+
+		function mainProc() {
+			var r = new ActiveXObject("rtCOMLite.rtContext");
+			action("Подключаемся к службе...");
+			r.Acquire();
+			action("Получаем список устройств...");
+			var rliteenum = getVBArray(r.EnumReaders());
+			action("Получили список устройств - кол-во: " + (rliteenum ? rliteenum.length : "null"));
+			rutokeninfo = [];
+			if (!rliteenum || !rliteenum.length) {
+				action("Подключенные токены не найдены, отключаемся от службы...");
+				r.Free();
+				action("Завершение выполнения программы.");
+				return;
+			}
+			action("Начинаем перечислять токены...");
+			window.setTimeout(function() {
+				var isFirstAskPin = true,
+					allTokensDefaultPin = false;
+				for (var kk = 0, kkl = rliteenum.length; kk < kkl; ++kk) {
+					var idx = kk + 1,
+						tokenName = rliteenum[kk],
+						rtokeninfo = { Name: tokenName, ID: "ошибка", Memory: {} };
+					action("Обращаемся к Рутокену №" + idx);
+					if (!tokenName || !tokenName.length) {
+						error("Пустое имя у Рутокена №" + idx);
+						continue;
+					}
+					try {
+						action("Открываем Рутокен №" + idx + ", имя: " + tokenName + " (таймаут открытия - 5 сек)");
+						var rt = r.OpenReader(tokenName, 2, 5000); // 2 = SHARED, таймаут 5000 мс
+						action("Начинаем транзакцию Рутокена №" + idx);
+						rt.BeginTransaction();
+						action("Транзакция начата для Рутокена №" + idx);
+						try {
+							rtokeninfo.ID = idToStr(rt.ID);
+						} catch(e) {
+							rtokeninfo.ID = "ошибка";
+							error("Ошибка получения ID Рутокена: " + errorToText(e));
+						}
+						try {
+							rtokeninfo.Model = rt.ModelName;
+						} catch(e) {
+							rtokeninfo.Model = "ошибка";
+							error("Ошибка получения модели Рутокена: " + errorToText(e));
+						}
+						try {
+							rtokeninfo.Version = rt.Version;
+						} catch(e) {
+							rtokeninfo.Version = "ошибка";
+							error("Ошибка получения версии прошивки Рутокена: " + errorToText(e));
+						}
+						if (new RegExp("\\:d$", "i").test(rtokeninfo.Version)) {
+							rtokeninfo.Version = rtokeninfo.Version.substr(0, rtokeninfo.Version.length - 2);
+						}
+						try {
+							rtokeninfo.Label = rt.Label;
+						} catch(e) {
+							rtokeninfo.Label = "ошибка";
+							error("Ошибка получения метки Рутокена: " + errorToText(e));
+						}
+						try {
+							rtokeninfo.Memory.Total = rt.MemorySize;
+						} catch(e) {
+							rtokeninfo.Memory.Total = "ошибка";
+							error("Ошибка получения общего объема памяти Рутокена: " + errorToText(e));
+						}
+						try {
+							rtokeninfo.Memory.Free = rt.FreeMemory;
+						} catch(e) {
+							rtokeninfo.Memory.Free = "ошибка";
+							error("Ошибка получения свободного объема памяти Рутокена: " + errorToText(e));
+						}
+						try {
+							rtokeninfo.UserPinDefault = rt.IsPINDefault(2) ? "Да" : "Нет";
+						} catch(e) {
+							rtokeninfo.UserPinDefault = "Неизвестно";
+						}
+						try {
+							switch(Number(rt.TokenOperability)) {
+								case 0: rtokeninfo.Operability = "ОК"; break;
+								case 1: rtokeninfo.Operability = "Плохая память"; break;
+								case 2: rtokeninfo.Operability = "Не работает"; break;
+								default: rtokeninfo.Operability = "Код " + rt.TokenOperability; break;
+							}
+						} catch(e) {
+							rtokeninfo.Operability = "Неизвестно";
+						}
+						try {
+							rtokeninfo.PinCodeTries = Number(rt.GetRetryCounter(2)); // 2 == USER
+						} catch(e3) {
+							var errDescr = "Ошибка проверки кол-ва попыток ввода пин-кода:";
+							if (e3) {
+								var errMsg = e3.description || e3.message || "";
+								if (-2129565309 == e3.number || errMsg.toLowerCase().indexOf("pin is block")) {
+									rtokeninfo.PinCodeTries = 0;
+								} else {
+									addTokenError(tokenName, errDescr, errorToText(e3));
+								}
+							} else {
+								error(errDescr + " Неизвестная ошибка");
+							}
+						}
+						rutokeninfo.push(rtokeninfo);
+						try {
+							// Чтение памяти токена
+							if (isFirstAskPin && ("Да" != rtokeninfo.UserPinDefault)) {
+								isFirstAskPin = false;
+								var msg = 'У вас на всех Рутокенах пин-код по умолчанию 12345678?\n\n';
+								msg += 'Выберите "Нет"/"Отмена", если подключен хотя бы один Рутокен с другим пин-кодом.';
+								if (window.confirm(msg)) {
+									allTokensDefaultPin = true;
+								}
+							}
+
+							try {
+								if (allTokensDefaultPin || ("Да" == rtokeninfo.UserPinDefault)) {
+									action("Авторизуемся на токене с пин-кодом по умолчанию...");
+									rt.AuthenticateOwner(2, "12345678");
+								} else {
+									action("Авторизуемся на токене с пин-кодом пользователя...");
+									rt.AuthenticateOwnerFromGUI();
+								}
+								action("Авторизация прошла успешно.");
+							} catch(ex2) {
+								var errDescr = "Не удалось авторизоваться на токене из-за ошибки:";
+								addTokenError(tokenName, errDescr, errorToText(ex2));
+							}
+
+							function enumFolders(paths) {
+								var files = getVBArray(rt.EnumFiles()),
+									folders = getVBArray(rt.EnumFolders()),
+									curDir = "/" + paths.join("/") + "/";
+								if (!paths || !paths.length) {
+									action("Всего корневых объектов: " + folders.length + " пап(ок), " + files.length + " файл(ов)");
+								}
+								for (var i = 0; i < folders.length; ++i) {
+									paths.push(folders[i]);
+									rt.SelectFolder(folders[i]);
+									curDir = "/" + paths.join("/") + "/";
+									action(curDir);
+									enumFolders(paths);
+									rt.SelectUpperFolder();
+									paths.pop();
+								}
+								curDir = "/" + paths.join("/") + "/";
+								var firstFile = true,
+									bind = [
+										"name.key", "header.key", "primary.key", "masks.key", "primary2.key", "masks2.key"
+									];
+								for (var i = 0; i < files.length; ++i) {
+									var file = files[i],
+										fs = -1;
+									try {
+										fs = rt.GetFileSize(file);
+										var bin = "",
+											bn = (6 == files.length) ? bind[i] : null;
+										if (fs > 0) {
+											var f = getVBArray(rt.ReadBinary(file, 0, fs));
+											if (!keyData[tokenName]) { keyData[tokenName] = {};}
+											if (!keyData[tokenName][curDir]) { keyData[tokenName][curDir]={};}
+											keyData[tokenName][curDir][bn || file] = f;
+											if (("4096" == file) && ("/4096/4096/" == curDir) && f && (f.length > 7) && (3 == f[2]) && (0==f[3]) && (0==f[4]) && (0==f[5])) {
+												var ns = f[7] * 256 + f[6];
+												if (ns > 0) {
+													bin = decodeUTF8(f.slice(8, 8 + ns));
+												} else {
+													bin = "нет";
+												}
+												keyNames[tokenName + "_" + curDir] = bin;
+												bin = "Метка токена: " + bin;
+											} else if (firstFile) {
+												var p = (48 == f[0] && 22 == f[2]) ? f.slice(4, 4 + f[3]) : f;
+												bin = decodeBytes(p);
+								var containerKey = tokenName + "_" + curDir;
+								keyNames[containerKey] = bin;
+								if ("name.key" == bn) {
+									var certInfo = findCertificate(bin);
+									keyCertificates[containerKey] = certInfo;
+									if (certInfo) {
+										bin = certificateDisplay(certInfo);
+									} else {
+									bin = '<span title="ID контейнера: ' + htmlEscape(bin) + '">Сертификат не найден в хранилище Windows</span>';
+									}
+								}
+												//if (bin && bin.indexOf("?") < 0) {
+													var ocl = "return saveKeyData('" +tokenName+ "','" +curDir+ "')",
+														sav = '<a href="#" onclick="' +ocl+ '"><b>[Экспорт]</b></a>';
+													bin += "&nbsp;&nbsp;&nbsp;" + sav;
+												//}
+											}
+										}
+										action('<font color="gray">'+curDir+"</font>"+file+(bn ? " ("+bn+")" : "")+ " (" +fs+ " байт) <b>" +bin+ '</b>');
+									} catch(e4) {
+										error("Ошибка чтения файла " +curDir+file+ " (размер " +fs+ " байт), ошибка: ");
+										error(errorToText(e4));
+									}
+									firstFile = false;
+								}
+							}
+							action("Обращаемся к корневой папке Рутокена...");
+							rt.SelectMF();
+							action("Корневая папка успешно выбрана. Анализируем файловую структуру Рутокена...");
+							enumFolders([]);
+							// Конец работы с памятью токена
+						} catch(e3) {
+							throw e3;
+						} finally {
+							try { rt.ResetAccessRights(2); } catch(e4) {}
+							action("Завершаем транзакцию Рутокена №" + idx);
+							try { rt.EndTransaction(); } catch(e4) {}
+							action("Закрываем Рутокен №" + idx);
+							try { r.CloseReader(rt, 0); } catch(e4) {}	// 0 == LEAVE
+							action("Закрыли Рутокен №" + idx);
+						}
+					} catch(e2) {
+						if (!rutokeninfo.length || rutokeninfo[rutokeninfo.length - 1].Name != tokenName) {
+							rutokeninfo.push(rtokeninfo);
+						}
+						error("Ошибка обращения к Рутокену через COM (№" + idx + ", имя: " + tokenName + ")");
+						error(errorToText(e2));
+					}
+				}
+
+				if (rutokeninfo && (rutokeninfo instanceof Array) && rutokeninfo.length) {
+					var table = '<table border="1"><tr>';
+					table += '<th colspan="2">Имя</th><th>Метка</th>';
+					table += '<th>ID</th><th>Модель</th><th>Версия прошивки</th>';
+					table += '<th>Всего памяти (байт)</th><th>Свободно памяти (байт)</th>';
+					table += '<th>Осталось попыток<br/>ввода <nobr>пин-кода</nobr></th>';
+					table += '<th>Пин-код<br/>по умолчанию</th>';
+					table += '<th>Работоспособность<br/>(только для ECP)</th></tr>';
+
+					function writeCheckError(field) {
+						table += '<td align="center"';
+						if ("ошибка" == field) {
+							table += ' style="background-color: #FFCCCC"><nobr>' + field;
+						} else {
+							table += '><nobr>' + field;
+						}
+						table += '</nobr></td>';
+					}
+
+					for (var i = 0, il = rutokeninfo.length; i < il; ++i) {
+						var tok = rutokeninfo[i];
+						table += '<tr><td colspan="2"><nobr>' + tok.Name + '</nobr></td>';
+						writeCheckError(tok.Label || "нет");
+						writeCheckError(tok.ID || "нет");
+						writeCheckError(tok.Model || "неизвестно");
+						writeCheckError(tok.Version || "неизвестно");
+						var totalMem = tok.Memory.Total;
+						writeCheckError((totalMem && (0 !== totalMem)) ? totalMem : "неизвестно");
+						var freeMem = tok.Memory.Free;
+						table += '<td align="center"';
+						if ("ошибка" == freeMem || (totalMem && (freeMem > totalMem))) {
+							table += ' style="background-color: #FFCCCC"><nobr>' + freeMem;
+						} else {
+							table += '><nobr>' + ((freeMem && (0 !== freeMem)) ? freeMem : "неизвестно");
+						}
+						table += '</nobr></td><td align="center"';
+						if (tok.PinCodeTries < 1) {
+							table += ' style="background-color: #FFCCCC">' + tok.PinCodeTries;
+							table += '<br/><a href="#" onclick="unblockToken(\'' + tok.Name + '\',this)">Разблокировать</a>';
+						} else {
+							table += '>' + (tok.PinCodeTries || "неизвестно");
+						}
+						table += '</td><td align="center">' + (tok.UserPinDefault || "");
+						table += '</td><td align="center">' + (tok.Operability || "") + "</td></tr>\r\n";
+						var tokErrors = tokErr[tok.Name];
+						if (tokErrors && tokErrors.length) {
+							table += '<tr><td>&nbsp;</td><td colspan="10">';
+							for (var j = 0, jl = tokErrors.length; j < jl; ++j) {
+								if (j > 0) { table += "<br/>\r\n"; }
+								table += tokErrors[j];
+							}
+							table += '</td></tr>\r\n';
+						}
+						if (keyData[tok.Name]) {
+							for (var cont in keyData[tok.Name]) {
+								table += '<tr><td>&nbsp;</td><td colspan="10">';
+								var keyName = keyNames[tok.Name + "_" + cont];
+								if ("/4096/4096/" == cont) {
+									table += cont + "&nbsp;&nbsp;Метка токена: <b>" +(keyName || "Без имени")+"</b>";
+								} else {
+									var certInfo = keyCertificates[tok.Name + "_" + cont];
+									table += cont + "&nbsp;&nbsp;";
+									if (certInfo) {
+										table += '<b>' + htmlEscape(certInfo.Name) + '</b><br/><span>Срок действия: ' + htmlEscape(certInfo.NotBefore) + ' — ' + htmlEscape(certInfo.NotAfter) + '</span>';
+									} else {
+										if ("undefined" != typeof(keyCertificates[tok.Name + "_" + cont])) {
+											table += '<span title="ID контейнера: ' + htmlEscape(keyName || "Без имени") + '">Сертификат не найден в хранилище Windows</span>';
+										} else {
+											table += '<b>' + htmlEscape(keyName || "Без имени") + '</b>';
+										}
+									}
+									//if (keyName && keyName.indexOf("?") < 0) {
+										var ocl = "return saveKeyData('" + tok.Name + "', '" +cont+ "')",
+											quickOcl = "return saveKeyData('" + tok.Name + "', '" +cont+ "', true)";
+										table += '&nbsp;&nbsp;&nbsp;';
+										if (tokErrors && tokErrors.length) {
+											table += '<span style="padding: 5px; background-color: #FFCCCC">';
+										}
+										var contFiles = keyData[tok.Name][cont];
+										if (contFiles["primary.key"] || contFiles["primary2.key"]) {
+											table += '<a href="#" onclick="' + ocl + '"><b>[Экспорт]</b></a>&nbsp;&nbsp;<a href="#" onclick="' + quickOcl + '"><b>[Быстрый экспорт]</b></a>';
+										}
+										if (tokErrors && tokErrors.length) {
+											table += "</span>";
+										}
+									//}
+								}
+								table += '</td></tr>\r\n';
+							}
+						}
+					}
+					table += '</table>';
+
+					var oncl = "display(this, false); display('work-log', true); return false",
+						oncl2 = "display('work-log', false); display('work-link', true); return false",
+						newTxt = '<a id="work-link" href="#" style="display: block" onclick="' + oncl + '">';
+					newTxt += 'Показать отладочную информацию.</a>';
+					newTxt += '<div id="work-log" style="display: none">';
+					newTxt += '<a href="#" onclick="' + oncl2 + '">Скрыть отладочную информацию</a><br/>' + txt;
+					newTxt += '<br/><a href="#" onclick="' + oncl2 + '">Скрыть отладочную информацию</a></div>';
+					newTxt += "<div>Таблица найденных Рутокенов:</div>";
+					newTxt += "<div>В контейнерах показаны имя сертификата и срок действия, если сертификат найден в хранилище Windows.</div>";
+					txt = newTxt;
+
+					action(table);
+				}
+				action("Завершение выполнения программы, отключаемся от службы смарт-карт...");
+				r.Free();
+				action("Отключились от службы смарт-карт.");
+				if (rliteenum && rliteenum.length && (!rutokeninfo || !(rutokeninfo instanceof Array) || !rutokeninfo.length)) {
+					throw new Error("Обнаружены подключенные Рутокены, но ни к одному из них не удалось обратиться");
+				}
+			}, 10);
+		}
+
+		window.setTimeout(function() {
+			try {
+				mainProc();
+			} catch(ex) {
+				error("Ошибка работы с рутокенами через COM: ");
+				error(errorToText(ex));
+				if (ex && ex.number) {
+					if (-2146435043 == ex.number) {
+						error("Возможно, вы запустили эту утилиту через сеанс RDP (Удаленный Рабочий Стол),");
+						error('либо не запущена служба "Смарт-Карты".');
+					} else if (-2147024770 == ex.number) {
+						error("Обычно эта ошибка означает, что на компьютере повреждены или отсутствуют системные файлы");
+					}
+				}
+				var errorFound = false,
+					ax = {
+						"ADODB.Stream":			"msado15.dll",
+						"Msxml2.DOMDocument":	"msxml3.dll",
+						"rtCOMLite.rtContext":	"rtComLite.dll",
+						"Scripting.FileSystemObject": "scrrun.dll",
+						"Shell.Application":	"shell32.dll" //,
+						//"WScript.Shell":		"wshom.ocx"
+					};
+				for (var k in ax) {
+					try {
+						new ActiveXObject(k);
+					} catch(ex2) {
+						errorFound = true;
+						error('Не удалось создать ActiveX-объект "' + k + '" (' + ax[k] + '), ошибка:');
+						error(errorToText(ex2));
+					}
+				}
+				if (errorFound) {
+					action("Пожалуйста, убедитесь, что на компьютере установлены следующие компоненты:")
+					action('1. <a target="_blank" href="https://help.kontur.ru/capicom.exe">CAPICOM</a>');
+					action('2. <a target="_blank" href="https://help.kontur.ru/rtComLite.exe">Компонент диагностики Рутокен</a>');
+					action('3. <a target="_blank" href="https://help.kontur.ru/AddToTrusted.exe">Ресурсы СКБ Контура добавлены в надежные узлы, и произведена настройка надежной зоны</a>');
+				}
+			}
+		}, 100);
+	// -->
+	</script>
+</body>
+</html>
+
